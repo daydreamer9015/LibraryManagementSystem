@@ -1,14 +1,20 @@
 package com.library.controller;
 
+import com.library.dto.board.BoardCreateDTO;
+import com.library.dto.board.BoardDetailDTO;
 import com.library.dto.board.BoardListDTO;
+import com.library.entity.board.BoardCategory;
 import com.library.service.BoardService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import java.security.Principal;
 
 @Controller                     // Spring MVC Controller로 등록
 @RequestMapping("/boards")      // 기본 URL 매핑 : /boards
@@ -79,5 +85,66 @@ public class BoardController {
 
         return "board/list";        // 게시글 목록 view
     }
+    @GetMapping("/{id}")
+    public String detail(
+            @PathVariable Long id,      // URL의 {id}를 메서드 파라미터로 바인딩
+            @RequestParam(defaultValue = "1") int page,      // 페이지 번호
+            Model model
+    ) {
+        // Service를 통해 게시글 상세 정보 조회 (조회수 자동 증가)
+        BoardDetailDTO board = boardService.getBoard(id);
+        model.addAttribute("board", board);
+        model.addAttribute("page", page);   // 목록 선택하면 그 목록 페이지로 넘어가야 함
+        return "board/detail";  // 게시글 상세 view
+    }
 
+    /*
+        게시글 작성 폼 페이지
+            - 새 게시글 작성하기 위한 폼을 표시함
+            - 카테고리 목록을 함께 전달하여 선택 가능하도록 함
+            - URL: GET /boards/new
+     */
+    @GetMapping("/new")
+    public String createForm(Model model) {
+        // 빈 DTO 객체 생성 (Thymeleaf Form에 바인딩 될 객체)
+        model.addAttribute("board", new BoardCreateDTO());
+        // 카테고리 목록 전달 (select 옵션으로 선택)
+        model.addAttribute("categories", BoardCategory.values());
+        return "board/form";        // 게시글 작성 폼 뷰
+    }
+
+    /*
+        게시글 작성 처리
+     */
+    @PostMapping
+    public String create(
+            @Valid @ModelAttribute BoardCreateDTO boardCreateDTO,  // @Valid: 검증 활성화, @ModelAttribute: 폼 데이터 바인딩
+            BindingResult bindingResult,    // @Valid: 검증 결과, Thymeleaf #fields 객체 사용 가능
+            Principal principal,    // Spring Security 로그인 사용자, principal.getName() 이메일 획득
+            Model model,    // View에 전달할 데이터
+            RedirectAttributes redirectAttributes       // 리다이렉트 시 일회용 데이터 전달할 목적
+    ) {
+        // 검증 실패 처리
+        if (bindingResult.hasErrors()) {    // @Valid로 검증한 결과 에러가 있다면
+            model.addAttribute("categories", BoardCategory.values());   // 카테고리 목록 재추가
+            return "board/form";    // 폼으로 돌아감 (필드별 에러 메시지 포함)
+        }
+        try {
+            // 성공 처리
+            String userEmail = principal.getName(); // 현재 로그인 사용자 이메일 획득
+            Long boardId = boardService.createBoard(boardCreateDTO, userEmail); // 게시글 생성
+
+            redirectAttributes.addFlashAttribute("success", "게시글이 작성되었습니다.");   // 성공 메시지
+            return "redirect:/boards/" + boardId;   // detail.html로 이동 (success 메시지 표시)
+        } catch (Exception e) {
+            // 예외 발생 처리
+            // 게시글 생성 중 예외 발생 (DB 오류, 파일 업로드 오류 등)
+            // 에러 메시지를 모델에 추가
+            model.addAttribute("error", "게시글 작성 중 오류가 발생했습니다.");
+            model.addAttribute("errorType", "system_error");
+            // 카테고리 목록 다시 선택 (폼 재표시 용)
+            model.addAttribute("categories", BoardCategory.values());
+            return "board/form";    // form.html로 돌아감 (에러 메시지 표시)
+        }
+    }
 }

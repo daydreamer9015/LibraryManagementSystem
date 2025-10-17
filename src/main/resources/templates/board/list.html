@@ -251,7 +251,7 @@
                         </td>
                         <!-- 제목 (클릭 시 상세 페이지로 이동) -->
                         <td class="title">
-                            <a th:href="@{/boards/{id}(id=${board.id})}" th:text="${board.title}">
+                            <a th:href="@{/boards/{id}(id=${board.id}, page=${currentPage})}" th:text="${board.title}">
                                 게시글 제목
                             </a>
                             <!-- 댓글 수 표시 (댓글이 있을 때만) -->
