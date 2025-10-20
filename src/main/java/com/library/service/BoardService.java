@@ -3,6 +3,7 @@ package com.library.service;
 import com.library.dto.board.BoardCreateDTO;
 import com.library.dto.board.BoardDetailDTO;
 import com.library.dto.board.BoardListDTO;
+import com.library.dto.board.BoardUpdateDTO;
 import com.library.entity.board.Board;
 import com.library.entity.board.BoardFile;
 import com.library.entity.board.BoardStatus;
@@ -119,6 +120,7 @@ public class BoardService {
                 - 6) Insert board, board_file 쿼리 실행
                 - 7) 생성된 게시글의 ID 반환
      */
+    @Transactional
     public Long createBoard(BoardCreateDTO createDTO, String userEmail) {
         // 1) 현재 로그인한 사용자 정보 조회
         Member author = memberRepository.findByEmail(userEmail).orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
@@ -163,4 +165,112 @@ public class BoardService {
         // 5) 생성된 게시글 ID 반환
         return savedBoard.getId();
     }
+    /*
+        게시글 삭제 (Soft Delete)
+            - 실제 데이터를 삭제하지 않고 상태만 DELETED로 변경함
+            - 작성자 본인만 삭제할 수 있음 (권한 검증)
+            - 더티체킹으로 상태 변경이 DB에 자동 반영
+            - 장점 : 데이터 복구 가능, 감사 추적 유지, 통계 데이터 보존, 외래키 제약 조건 유지
+     */
+    @Transactional
+    public void deleteBoard(Long id, String userEmail) {
+        // 1) 게시글 조회 (작성자 정보 포함 - Fetch Join)
+        Board board = boardRepository.findByIdAndStatusWithAuthor(id, BoardStatus.ACTIVE).orElseThrow(() -> new RuntimeException("게시글을 찾을 수 없습니다."));
+
+        // 2) 권한 검증 - 작성자 본인만 삭제 가능하도록
+        if (!board.getAuthor().getEmail().equals(userEmail)) {
+            throw new RuntimeException("게시글을 삭제할 권한이 없습니다.");
+        }
+
+        // 3) Soft Delete 실행 (상태만 변경)
+        board.delete();
+
+        // 4) 메서드 종료 - 트랜잭션 커밋 직전 더티체킹 실행
+        /*
+            JPA가 스냅샷과 현재 엔티티를 비교하여 status 변경 감지
+            UPDATE board SET status='DELETED', updated_at=? WHERE id=?
+         */
+    }
+
+    /*
+        게시글 수정용 조회
+            - 수정 폼에 표시할 게시글 정보 조회
+            - 작성자 본인만 조회 가능 (권한 검증)
+            - ACTIVE 상태의 게시글만 조회
+    */
+    @Transactional(readOnly = true)
+    public BoardDetailDTO getBoardForEdit(Long id, String userEmail) {
+        // 1) 게시글 조회 (작성자 정보 포함하여)
+        Board board = boardRepository.findByIdAndStatusWithAuthor(id, BoardStatus.ACTIVE)
+                        .orElseThrow(() -> new RuntimeException("게시글을 찾을 수 없습니다."));
+
+        // 2) 권한 검증 - 작성자 본인만 수정 가능
+        if (!board.getAuthor().getEmail().equals(userEmail)) {
+            throw new RuntimeException("게시글을 수정할 권한이 없습니다.");
+        }
+
+        // 3) DTO로 변환하여 반환
+        return BoardDetailDTO.from(board);
+    }
+    /*
+        게시글 수정
+            - 제목, 내용, 카테고리 수정
+            - 기존 파일 삭제 및 새 파일 추가 처리
+            - 작성자 본인만 수정 가능 (권한 검증)
+            - 더티체킹으로 변경사항 자동 DB 반영
+     */
+    @Transactional(readOnly = false)
+    public void updateBoard(Long id, BoardUpdateDTO updateDTO, String userEmail) {
+        // 1) 게시글 조회 (작성자 정보 포함)
+        Board board = boardRepository.findByIdAndStatusWithAuthor(id, BoardStatus.ACTIVE)
+                        .orElseThrow(() -> new RuntimeException("게시글을 찾을 수 없습니다."));
+
+        // 2) 작성자 본인만 수정 가능
+        if (!board.getAuthor().getEmail().equals(userEmail)) {
+            throw new RuntimeException("게시글을 수정할 권한이 없습니다.");
+        }
+
+        // 3) 게시글 기본 정보 수정 (더티체킹으로 자동 update)
+        board.update(updateDTO.getTitle(), updateDTO.getContent(), updateDTO.getCategory());
+
+        // 4) 기존 파일 삭제 처리
+        if (updateDTO.getDeleteFileIds() != null && !updateDTO.getDeleteFileIds().isEmpty()) {
+            // 삭제할 파일 ID 목록을 순회
+            for (Long fileId : updateDTO.getDeleteFileIds()) {
+                board.getFiles().stream()       // 현재 게시글의 첨부파일 스트림 생성
+                        .filter(file -> file.getId().equals(fileId))    // id가 일치하는 파일만 필터링
+                        .findFirst()    // 첫번째 일치하는 파일 찾기
+                        .ifPresent(file -> {
+                            // 물리적 파일 삭제
+                            fileStorageService.deleteFile(file.getFilePath(), file.getStoredFilename());
+                            // 컬렉션에서 제거 (orphanRemoval = true로 DB에서도 삭제됨)
+                            board.getFiles().remove(file);
+                        });
+            }
+        }
+        // 5) 새 파일 추가 처리
+        if (updateDTO.getFiles() != null && !updateDTO.getFiles().isEmpty()) {
+            for (MultipartFile file : updateDTO.getFiles()) {
+                // 빈 파일은 건너뛰기
+                if (file.isEmpty()) {
+                    continue;
+                }
+                String[] fileInfo = fileStorageService.storeFile(file, "boards");
+                String storedFilename = fileInfo[0];    // 배열[0] : 서버에 저장된 고유 파일명
+                String filePath = fileInfo[1];          // 배열[1] : 파일이 저장된 전체 경로
+                BoardFile boardFile = BoardFile.builder() // BoardFile 엔티티 생성
+                        .originalFilename(file.getOriginalFilename())   // 사용자가 업로드한 원본 파일명
+                        .storedFilename(storedFilename)         // 서버에 저장된 고유 파일명 (UUID + 확장자)
+                        .filePath(filePath)     // 파일이 저장된 전체 경로
+                        .fileSize(file.getSize())
+                        .fileExtension(fileStorageService.getFileExtension(file.getOriginalFilename()))
+                        .mimeType(file.getContentType())    // 파일의 MIME 타입 (예: "image/jpeg")
+                        .downloadCount(0L)
+                        .build();
+                board.addFile(boardFile);       // board 엔티티에 BoardFile 추가
+            }
+        }
+    }
+    // 6) 메서드 종류 - 트랜잭션 커밋 직전 더티체킹 실행
+    // JPA가 변경사항을 감지하여 자동으로 update 쿼리 실행
 }

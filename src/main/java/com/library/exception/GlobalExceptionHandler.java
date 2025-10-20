@@ -20,7 +20,7 @@ import org.springframework.web.servlet.ModelAndView;
         3) RuntimeException (일반 런타임 에러 발생 시)
         4) Exception (모든 예외의 최종 방어선)
  */
-@ControllerAdvice   // 모든 Controller에 적용되는 전역 예외 처리
+//@ControllerAdvice   // 모든 Controller에 적용되는 전역 예외 처리
 @Slf4j
 public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidFileException.class)
