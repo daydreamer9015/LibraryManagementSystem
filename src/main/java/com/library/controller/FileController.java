@@ -9,6 +9,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 
@@ -35,7 +37,8 @@ public class FileController {
             - 파일 다운로드 응답 반환
             - URL: GET /files/download/{fileId}
      */
-
+    @GetMapping("/download/{fileId}")
+    @Transactional  // 다운로드 횟수 증가를 더티체킹으로 저장
     public ResponseEntity<Resource> downloadFile(@PathVariable Long fileId) {
         // 1. 파일 정보 조회
         BoardFile boardFile = boardFileRepository.findById(fileId)      // DB에서 파일 ID로 BoardFile 엔티티 조회

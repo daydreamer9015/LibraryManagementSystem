@@ -36,6 +36,70 @@ public class BoardFileDTO {
     private Long fileSize;              // 파일 크기 (바이트 단위)
     private String fileExtension;       // 파일 확장자 (소문자)
     private Long downloadCount;         // 다운로드 횟수
+
+    // 파일 타입 반환하는 메서드 (아이콘 및 색상 구분)
+    public String getFileType() {
+        String ext = fileExtension.toLowerCase();
+        // 이미지 파일
+        if (ext.equals("jpg") || ext.equals("jpeg") || ext.equals("png") || ext.equals("gif")) {
+            return "image";
+        }
+        // PDF 파일
+        else if (ext.equals("pdf")) {
+            return "pdf";
+        }
+        // 워드 문서
+        else if (ext.equals("doc") || ext.equals("docx")) {
+            return "document";
+        }
+        // 엑셀 파일
+        else if (ext.equals("xls") || ext.equals("xlsx")) {
+            return "excel";
+        }
+        // 파워포인트 파일
+        else if (ext.equals("ppt") || ext.equals("pptx")) {
+            return "powerpoint";
+        }
+        // 압축파일
+        else if (ext.equals("zip") || ext.equals("rar")) {
+            return "archive";
+        }
+        // 텍스트
+        else if (ext.equals("txt")) {
+            return "text";
+        }
+        // 한글파일
+        else if (ext.equals("hwp") ) {
+            return "document";
+        }
+        // 기타
+        else {
+            return "default";
+        }
+    }
+
+    // 파일 아이콘 클래스를 반환하는 메서드 (Font Awesome 아이콘 클래스)
+    public String getFileIconClass() {
+        String type = getFileType();
+        switch (type) {
+            case "image":
+                return "fa-file-image";
+            case "pdf":
+                return "fa-file-pdf";
+            case "document":
+                return "fa-file-word";
+            case "excel":
+                return "fa-file-excel";
+            case "powerpoint":
+                return "fa-file-powerpoint";
+            case "archive":
+                return "fa-file-archive";
+            case "text":
+                return "fa-file-alt";
+            default:
+                return "fa-file";
+        }
+    }
     
     // 사람이 읽기 쉬운 파일 크기 문자열 리턴하는 메서드
     public String getFormattedFileSize() {

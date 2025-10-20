@@ -125,7 +125,139 @@
                 gap: 10px;
             }
 
+            /* alert 기본 스타일 */
+            .alert {
+                padding: 12px 16px;
+                border: 1px solid;
+                border-radius: 4px;
+            }
+            /* 첨부 파일 영역 스타일 */
+            .board-files {  /* 첨부파일 컨테이너 */
+                padding: 30px;
+                border-bottom: 2px solid #e9ecef;
+                background-color: #f8f9fa;
+            }
 
+            .files.header { /* 첨부파일 헤더 */
+                font-size: 18px;
+                font-weight: bold;
+                color: #333;
+                margin-bottom: 15px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .files-header i {
+                color: #007bff;
+            }
+
+            .file-list {    /* 파일 목록 */
+                list-style: none;
+                padding: 0;
+                margin: 0;
+            }
+
+            .file-item {    /* 개별 파일 아이템 */
+                display: flex;
+                align-items: center;
+                padding: 12px 15px;
+                margin-bottom: 8px;
+                background-color: white;
+                border: 1px solid #dee2e6;
+                border-radius: 6px;
+                transition: all 0.2s ease;
+            }
+
+            .file-item:hover {
+                background-color: #f8f9fa;
+                border-color: #007bff;
+                transform: translateX(5px);     /* 오른쪽으로 5px 이동 */
+            }
+
+            .file-item:last-child{
+                margin-bottom: 0;
+            }
+
+            .file-icon {
+                width: 40px;
+                height: 40px;
+                display: flex;
+                align-items: center;            /* 세로 중앙 정렬 */
+                justify-content: center;        /* 가로 중앙 정렬 */
+                border-radius: 8px;
+                margin-right: 12px;
+                font-size: 20px;
+            }
+
+            .file-icon.IMAGE {
+                background-color: #e3f2fd;
+                color: #1976d2;
+            }
+
+            .file-icon.DOCUMENT {
+                background-color: #fff3e0;
+                color: #f57c00;
+            }
+
+            .file-icon.ARCHIVE {
+                background-color: #f3e5f5;
+                color: #7b1fa2;
+            }
+
+            .file-icon.OTHER {
+                background-color: #e0e0e0;
+                color: #616161;
+            }
+
+            .file-info {
+                flex: 1;        /* 남은 공간 채우기 */
+                display: flex;
+                flex-direction: column;     /* 세로 방향 배치 */
+                gap: 4px;
+            }
+
+            .file-name {
+                font-size: 15px;
+                font-weight: 500;
+                color: #333;
+                word-break: break-all;      /* 긴 파일명 줄바꿈 */
+            }
+
+            .file-meta {
+                display: flex;
+                gap: 12px;
+                font-size: 13px;
+                color: #6c757d;
+            }
+
+            .file-meta i {
+                margin-right: 4px;
+                font-size: 12px;
+            }
+
+            .file-download-btn {
+                padding: 8px 16px;
+                background-color: #007bff;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                text-decoration: none;
+                transition: background-color 0.2s ease;
+                white-space: nowrap;        /* 텍스트 줄바꿈 방지 */
+            }
+
+            .file-download-btn:hover {
+                background-color: #0056b3;
+                text-decoration: none;
+            }
+
+            .file-download-btn i {
+                margin-right: 4px;
+            }
         </style>
     </th:block>
 </head>
@@ -187,6 +319,36 @@
                         게시글 내용이 여기에 표시됩니다.
                     </div>
                 </div>
+                <!-- === 첨부 파일 영역 ===
+                    첨부파일이 존재할 경우에만 표시.
+                    #lists: Thymeleaf 리스트 유틸리티 객체 .isEmpty()
+                 -->
+                <div class="board-files" th:if="${not #lists.isEmpty(board.files)}">
+                    <div class="files-header">
+                        <i class="fas fa-paperclip"></i>    <!-- 클립 아이콘 -->
+                        <span>첨부파일(<span th:text="${#lists.size(board.files)}">0</span>개)</span>
+                    </div>
+                </div>
+                <!-- 파일 목록(순서 없는 리스트) -->
+                <ul class="file-list">
+                    <li class="file-item" th:each="file : ${board.files}">
+                        <div class="file-icon" th:classappend="${file.getFileType()}">
+                            <i class="fas" th:classappend="${file.getFileIconClass()}"></i>
+                        </div>
+                        <!-- 파일 정보 영역 (파일명, 다운로드 링크 등의 메타 정보) -->
+                        <div class="file-info">
+                            <div class="file-name" th:text="${file.originalFilename}">파일명.jpg</div>
+                            <div class="file-meta">
+                                <span><i class="fas fa-hdd"></i><span th:text="${file.getFormattedFileSize()}">1.1MB</span></span>
+                                <span><i class="fas fa-download"></i><span th:text="${file.downloadCount}">0</span>회</span>
+                            </div>
+                        </div>
+                        <!-- 파일 다운로드 버튼 (GET /files/download/{id}) -->
+                        <a th:href="@{/files/download/{id}(id=${file.id})}" class="file-download-btn">
+                            <i class="fas fa-download"></i> 다운로드
+                        </a>
+                    </li>
+                </ul>
                 <!-- === 게시글 푸터 (버튼 영역) === -->
                 <div class="board-footer">
                     <div class="btn-group">
@@ -194,8 +356,14 @@
                             <i class="fas fa-list"></i> 목록
                         </a>
                     </div>
-                    <div class="btn-group" sec:authorize="isAuthenticated()">
-                        <!-- 추후 구현 예정 -->
+                    <div class="btn-group" sec:authorize="isAuthenticated()" th:if="${#authentication.name == board.authorEmail}">
+                        <!-- 로그인한 사용자가 작성자일 경우에만 수정/삭제 버튼 표시 -->
+                        <a th:href="@{/boards/{id}/edit(id=${board.id})}" class="btn btn-outline">
+                            <i class="fas fa-edit"></i> 수정
+                        </a>
+                        <button type="button" class="btn btn-danger" onclick="deleteBoard()">
+                            <i class="fas fa-trash-alt"></i> 삭제
+                        </button>
                     </div>
                 </div>
             </div>
@@ -203,7 +371,61 @@
     <!-- 게시글 상세 페이지 전용 JavaScript (layout.html의 </body> 직전에 삽입됨 -->
     <th:block th:fragment="scripts">
         <script>
+            /*
+                게시글 삭제 함수
+                    - 사용자에게 삭제 확인을 받은 후 DELETE 요청을 보냄
+                    - HTML form을 동적으로 생성하여 제출 (DELETE 메서드 지원)
+            */
+            function deleteBoard() {
+                // 1) 사용자에게 삭제 확인
+                if (!confirm('정말 이 게시글을 삭제하시겠습니까?\n삭제된 게시글은 복구할 수 없습니다.')) {
+                    return;     // 취소하면 함수 종료
+                }
+                /* 2) Thymeleaf로 게시글 ID 가져오기
+                    - [[ ${expression} ]] : Thymeleaf 인라인 표현식 - 서버 변수를 JS 변수로 변환
+                */
+                const boardId = [[${board.id}]];
+                /*
+                    3) HTML form 동적 생성
+                        - JavaScript로 form 요소를 동적으로 생성
+                        - 삭제 요청을 서버로 전송하기 위한 form
+                */
+                const form = document.createElement('form');     // <form> 태그 생성
+                form.method = 'POST';   // HTTP POST 메서드 (브라우저는 form으로 DELETE를 직접 못 보냄)
+                form.action = `/boards/${boardId}`;     // 요청 URL: /boards/123 (게시글 ID 포함)
 
+                /*
+                    4) Spring이 DELETE로 인식
+                        - _method 필드 추가
+                            - 브라우저는 form으로 DELETE 메서드를 직접 보낼 수 없음
+                            - POST로 보내고 _method=DELETE로 Spring에게 알려줌
+                            - Spring의 HiddenHttpMethodFilter가 이를 감지하여 DELETE로 변환
+                */
+                const methodInput = document.createElement('input');
+                methodInput.type = 'hidden';    // 화면에 보이지 않는 hidden 필드
+                methodInput.name = '_method';   // Spring이 인식하는 필드 이름
+                methodInput.value = 'DELETE';   // HTTP DELETE 메서드 지정
+                form.appendChild(methodInput);  // form에 필드 추가
+
+                /*
+                    5) CSRF 토큰 추가 (Spring Security 보안)
+                        - layout.html의 메타 태그에서 CSRF 토큰 읽기
+                        - Spring Security가 요청 시 자동 검증
+                */
+                const csrfToken = document.querySelector('meta[name="_csrf"]').content;     // CSRF 토큰 값
+                const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;  //CSRF 헤더 이름
+
+                // CSRF 토큰을 hidden input으로 form에 추가
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = '_csrf';   // Spring Security가 인식하는 파라미터 이름
+                csrfInput.value = csrfToken;    // 실제 토큰 값
+                form.appendChild(csrfInput);    // form에 필드 추가
+
+                // 6) form을 body에 추가하고 제출
+                document.body.appendChild(form);
+                form.submit();
+            }
         </script>
     </th:block>
 </body>

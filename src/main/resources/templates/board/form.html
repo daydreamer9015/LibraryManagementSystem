@@ -4,7 +4,7 @@
       th:replace="~{common/layout :: layout(~{::title}, ~{::content}, ~{::css}, ~{::scripts})}">
 <head>
     <meta charset="UTF-8">
-    <title>게시글 작성</title>
+    <title th:text="${isEditMode != null and isEditMode} ? '게시글 수정' : '게시글 작성'">게시글 작성</title>
     <!-- 레이아웃에 삽입될 CSS 블록 정의 -->
     <th:block th:fragment="css">
         <style>
@@ -18,23 +18,33 @@
             }
 
             .form-header {
-
+                margin-bottom: 30px;
             }
 
             .form-header h2 {
-
+                font-size: 28px;
+                font-weight: bold;
+                color: #333;
+                margin: 0;
+                padding-bottom: 15px;
+                border-bottom: 2px solid #007bff;
             }
 
             .form-group {
-
+                margin-bottom: 20px;
             }
 
             .form-group label {
-
+                display: block;
+                font-weight: 600;
+                margin-bottom: 8px;
+                color: #333;
             }
 
             .form-group label .required {
-
+                color: #dc3545;
+                margin-left: 4px;
+                font-weight: bold;
             }
 
             /* === 입력 필드 공통 스타일 === */
@@ -42,28 +52,46 @@
             .form-group select,
             .form-group textarea,
             .form-group input[type="file"] {
-
+                width: 100%;
+                padding: 12px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                font-size: 14px;
+                font-family: 'Arial', sans-serif;
+                background-color: #fff;
+                transition: border-color 0.3s ease;
+                box-sizing: border-box;
             }
             /* === 포커스 상태 (입력 필드 클릭 시) === */
             .form-group input[type="text"]:focus,
             .form-group select,
             .form-group textarea,
             .form-group input[type="file"] {
-
+                outline: none;
+                border-color: #007bff;
+                box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+                background-color: #f8f9fa;
             }
 
             .form-group textarea {
-
+                resize: vertical;       /* 수직 크기 조정만 허용함 */
+                min-height: 150px;
+                line-height: 1.6;
             }
 
             .error-message {
-
+                display: block;
+                color: #dc3545;
+                font-size: 13px;
+                margin-top: 5px;
+                font-weight: 500;
             }
 
             .form-group.error input,
             .form-group.error select,
             .form-group.error textarea {
                 border-color: #dc3545;
+                background-color: #fff5f5;
             }
 
             .form-actions {
@@ -123,14 +151,25 @@
         </div>
         <!-- 페이지 헤더 -->
         <div class="form-header">
-            <h2>게시글 작성</h2>
+            <h2 th:text="${isEditMode != null and isEditMode} ? '게시글 수정' : '게시글 작성'">게시글 작성</h2>
         </div>
         <!-- th:object="${board}" : board 객체와 폼 필드 바인딩
              enctype="multipart/form-data" : 파일 업로드를 위한 인코딩 타입
              ${#fields.hasErrors('category')} : #fields 유틸리티 객체로 category 필드의 에러 여부 확인
                 ? 'error' : 에러가 있으면 'error' 클래스 추가
+
+            HTML form은 GET/POST만 지원하므로:
+                method="post" + _method=PUT 조합 사용
+                Spring의 HiddenHttpMethodFilter가 PUT으로 변환
         -->
-        <form th:action="@{/boards}" th:object="${board}" method="post" enctype="multipart/form-data" id="boardForm">
+                                        <!-- 수정모드면 /boards/{id}, 작성모드면 /boards -->
+        <form th:action="@{${(isEditMode != null and isEditMode)}} ? '/boards/' + boardId : '/boards'"
+              th:object="${board}"
+              method="post"
+              enctype="multipart/form-data"
+              id="boardForm">
+            <!-- 수정모드일 때만 PUT 메서드 사용 -->
+            <input type="hidden" name="_method" th:if="${isEditMode != null and isEditMode}" value="PUT">
             <div class="form-group" th:classappend="${#fields.hasErrors('category')} ? 'error'">
                 <label>
                     카테고리
@@ -185,12 +224,38 @@
                         multiple
                         accept="image/*, .pdf, .doc, .docx, .xls, .xlsx, .ppt, .pptx, .txt, .zip">
                 <span class="help-text">이미지 문서 파일 등을 첨부할 수 있습니다 .(최대 10MB, 여러 파일 선택 가능)</span>
+                <!-- 수정모드일 때만 기존 첨부파일 목록 표시: isEditMode=true AND existingFiles가 null이 아님 AND 비어있지 않음 -->
+                <div class="existing-files" th:if="${isEditMode != null and isEditMode and existingFiles != null and not #lists.isEmpty(existingFiles)}">
+                    <!-- 기존 첨부파일 헤더: 파일 개수 표시 -->
+                    <div class="existing-files-header">
+                        <i class="fas fa-paperclip"></i> 기본 첨부파일 (<span th:text="${#lists.size(existingFiles)}">0</span>개)
+                    </div>
+                    <!-- existingFiles 리스트를 순회하며 각 파일을 file-item으로 표시 -->
+                    <div th:each="file : ${existingFiles}" class="file-item">
+                        <!-- 삭제할 파일 선택용 체크박스 -->
+                        <input type="checkbox" name="deleteFileIds" th:value="${file.id}" th:id="'file-' + ${file.id}">
+                        <!-- 체크박스와 연결된 label (클릭시 체크박스 토글) -->
+                        <label th:for="'file-' + ${file.id}">
+                            <!-- 파일 타입별 아이콘 -->
+                            <i class="fas" th:classappend="${file.getFileIconClass()}"></i>
+                            <!-- 원본 파일명 표시 -->
+                            <span class="file-name" th:text="${file.originalFilename}">파일명.jpg</span>
+                            <!-- 포맷된 파일 크기 표시 -->
+                            <span class="file-size" th:text="${file.getFormattedFileSize()}"></span>
+                        </label>
+                    </div>
+                    <!-- 안내 문구 -->
+                    <span class="help-text" style="margin-top: 10px; display: block;">
+                        <i class="fas fa-info-circle"></i>삭제할 파일을 체크하세요.
+                    </span>
+                </div>
             </div>
 
             <!-- 버튼 영역 -->
             <div class="form-actions">
-                <a th:href="@{/boards}" class="btn btn-secondary">취소</a>
-                <button type="submit" class="btn btn-primary">작성완료</button>
+                <!-- 취소 버튼 : 수정모드면 상세페이지로 (/boards/{id}), 작성모드면 목록으로(/boards) 이동 -->
+                <a th:href="@{${(isEditMode != null and isEditMode)} ? '/boards/' + boardId : '/boards'}" class="btn btn-secondary">취소</a>
+                <button type="submit" class="btn btn-primary" id="submitBtn" th:text="${isEditMode != null and isEditMode} ? '수정완료' : '작성완료'">작성완료</button>
             </div>
         </form>
         <!-- 파일 업로드 및 폼 제출 검증 JavaScript -->
@@ -228,7 +293,7 @@
                         // 2) 파일 확장자 검증
                         const fileName = file.name.toLowerCase();
                         const extension = fileName.substring(fileName.lastIndexOf('.') + 1);
-                        if (ALLOWED_EXTENSION.includes(extension)) {
+                        if (!ALLOWED_EXTENSIONS.includes(extension)) {
                             errorMessages.push(file.name + ': 허용되지 않은 파일 형식입니다. (' + extension + ')');
                         }
                     }
@@ -274,8 +339,11 @@
                         return false;       // 함수 종료
                     }
                     // === 필수 필드 검증 끝 ===
+                    // 수정/작성 확인 메시지 동적 생성
+                    const isEditMode = /* [[${isEditMode}]] || */ false;
+                    const confirmMessage = isEditMode ? '게시글을 수정하시겠습니까?' : '게시글을 작성하시겠습니까?';
 
-                    if (!confirm('게시글을 작성하시겠습니까?')) {       // 사용자가 '취소'를 클릭한 경우
+                    if (!confirm(confirmMessage)) {       // 사용자가 '취소'를 클릭한 경우
                         console.log('사용자 취소');
                         e.preventDefault();     // 폼 제출을 중단 (서버로 전송하지 않음)
                         return false;
