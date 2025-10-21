@@ -163,7 +163,7 @@
                 Spring의 HiddenHttpMethodFilter가 PUT으로 변환
         -->
                                         <!-- 수정모드면 /boards/{id}, 작성모드면 /boards -->
-        <form th:action="@{${(isEditMode != null and isEditMode)}} ? '/boards/' + boardId : '/boards'"
+        <form th:action="@{${(isEditMode != null and isEditMode) ? '/boards/' + boardId : '/boards'}}"
               th:object="${board}"
               method="post"
               enctype="multipart/form-data"
